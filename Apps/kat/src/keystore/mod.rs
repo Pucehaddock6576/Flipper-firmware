@@ -1,0 +1,193 @@
+//! Embedded keystore: binary blob of protocol keys (KIA, Star Line, VAG).
+//! Matches ProtoPirate key types (keys.c: KIA_KEY1..4). Loaded at startup instead of keystore_dir.
+
+mod embedded;
+
+use std::convert::TryInto;
+
+/// Type IDs that are KeeLoq manufacturer keys (64-bit keys used for keeloq_decrypt).
+const KEELOQ_MF_TYPES: &[u32] = &[0, 1, 2, 10, 20];
+
+/// Names for each key entry in the blob (same order as entries before VAG). Used for fallback decode display.
+const KEY_ENTRY_NAMES: &[&str] = &[
+    "KGB/Subaru",
+    "Magic_2",
+    "IronLogic",
+    "Stilmatic",
+    "Pandora_Test_Debug_2",
+    "Rosh",
+    "Dea_Mio",
+    "Leopard",
+    "Sheriff",
+    "Cenmax",
+    "Centurion",
+    "Guard_RF-311A",
+    "Pandora_PRO",
+    "Cardin_S449",
+    "Pandora_DEA",
+    "Pandora_GIBIDI",
+    "Pandora_MCODE",
+    "Pandora_Unknown_1",
+    "Pandora_SUZUKI",
+    "Harpoon",
+    "Gibidi",
+    "Pandora_Unknown_2",
+    "Jarolift",
+    "KEY",
+    "Novoferm",
+    "Pandora_SUBARU",
+    "Pecinin",
+    "Merlin",
+    "Pandora_M101",
+    "IL-100(Smart)",
+    "Pantera_CLK",
+    "Kingates_Stylo4k",
+    "Monarch",
+    "Aprimatic",
+    "NICE_MHOUSE",
+    "BFT",
+    "Pantera",
+    "KIAV5",
+    "FAAC_SLH",
+    "Alligator_S-275",
+    "NICE_Smilo",
+    "SL_A6-A9/Tomahawk_9010",
+    "Motorline",
+    "KIAV6A",
+    "Tomahawk_TZ-9030",
+    "Cenmax_St-7",
+    "Pantera_XS/Jaguar",
+    "APS-1100_APS-2550",
+    "Reff",
+    "KIAV6B",
+    "Beninca_ARC",
+    "Tomahawk_Z,X_3-5",
+    "Sommer",
+    "Pandora_PRO2",
+    "DoorHan",
+    "EcoStar",
+    "JCM_Tech",
+    "Faraon",
+    "Came_Space",
+    "Magic_4",
+    "SL_A2-A4",
+    "Elmes_Poland",
+    "Normstahl",
+    "KIA",
+    "GSN",
+    "Mutanco_Mutancode",
+    "Cenmax_St-5",
+    "Magic_3",
+    "Partisan_RX",
+    "Steelmate",
+    "Teco",
+    "ZX-730-750-1055",
+    "Jolly_Motors",
+    "Beninca",
+    "Mongoose",
+    "Alligator",
+    "Comunello",
+    "SL_B6,B9_dop",
+    "FAAC_RC,XT",
+    "Genius_Bravo",
+    "Rossi",
+    "DTM_Neo",
+    "Star Line",
+];
+
+const MAGIC: &[u8; 4] = b"KATK";
+const VAG_TAG: &[u8; 4] = b"VAG ";
+const VAG_SIZE: usize = 64;
+const ENTRY_SIZE: usize = 4 + 8; // u32 type + u64 key
+
+/// Parsed result from the embedded blob: (type_id, key) pairs and raw VAG bytes.
+pub struct ParsedKeystore {
+    pub entries: Vec<(u32, u64)>,
+    pub vag_bytes: Vec<u8>,
+}
+
+/// Parse the embedded keystore blob. Returns KIA/Star Line entries and VAG raw bytes.
+///
+/// Keys are stored as 8 bytes **little-endian** per entry; we load with `u64::from_le_bytes`.
+/// The resulting u64 value matches the reference/Pandora hex (e.g. KIA = 0xA8F5DFFC8DAA5CDB),
+/// which is typically written MSB-first in docs; KeeLoq uses this value as a 64-bit key.
+pub fn parse_blob(blob: &[u8]) -> Option<ParsedKeystore> {
+    if blob.len() < 4 || &blob[0..4] != MAGIC {
+        return None;
+    }
+    let n = u16::from_le_bytes(blob[4..6].try_into().ok()?) as usize;
+    let mut off = 6;
+    let mut entries = Vec::with_capacity(n);
+    for _ in 0..n {
+        if off + ENTRY_SIZE > blob.len() {
+            return None;
+        }
+        let ty = u32::from_le_bytes(blob[off..off + 4].try_into().ok()?);
+        let key = u64::from_le_bytes(blob[off + 4..off + 12].try_into().ok()?);
+        entries.push((ty, key));
+        off += ENTRY_SIZE;
+    }
+    if off + 4 + VAG_SIZE > blob.len() || &blob[off..off + 4] != VAG_TAG {
+        return Some(ParsedKeystore {
+            entries,
+            vag_bytes: Vec::new(),
+        });
+    }
+    off += 4;
+    let vag_bytes = blob[off..off + VAG_SIZE].to_vec();
+    Some(ParsedKeystore {
+        entries,
+        vag_bytes,
+    })
+}
+
+/// Return all KeeLoq manufacturer keys from the embedded blob with display names.
+/// Used when an unknown signal is tried as KeeLoq with every key; on success we show "Keeloq (name)".
+/// Only includes entry types that are KeeLoq MF keys (0, 1, 2, 10, 20).
+pub fn keeloq_mf_keys_with_names() -> Vec<(String, u64)> {
+    let blob = embedded_blob();
+    let Some(parsed) = parse_blob(blob) else {
+        return Vec::new();
+    };
+    parsed
+        .entries
+        .iter()
+        .enumerate()
+        .filter(|(_, (ty, _))| KEELOQ_MF_TYPES.contains(ty))
+        .filter_map(|(i, (_, key))| {
+            let name = KEY_ENTRY_NAMES.get(i).copied().unwrap_or("?").to_string();
+            if *key == 0 {
+                None
+            } else {
+                Some((name, *key))
+            }
+        })
+        .collect()
+}
+
+/// Return the embedded keystore blob for loading.
+pub fn embedded_blob() -> &'static [u8] {
+    embedded::KEYSTORE_BLOB
+}
+
+/// Return all (type_id, key_u64) from the embedded blob for comparison with external key lists (e.g. Pandora).
+/// Key is stored LE in blob; returned as u64. Format as 16-char hex with format!("{:016X}", key) to match Pandora.
+#[cfg(test)]
+pub fn embedded_entries_for_compare() -> Vec<(u32, u64)> {
+    parse_blob(embedded_blob()).map(|p| p.entries).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dump_keystore_keys_for_pandora_compare() {
+        let entries = embedded_entries_for_compare();
+        eprintln!("KAT embedded keystore keys (type, hex, name):");
+        for (i, (ty, key)) in entries.iter().enumerate() {
+            let name = KEY_ENTRY_NAMES.get(i).copied().unwrap_or("?");
+            eprintln!("  type {}  {}  {}", ty, format!("{:016X}", key), name);
+        }
+    }
+}

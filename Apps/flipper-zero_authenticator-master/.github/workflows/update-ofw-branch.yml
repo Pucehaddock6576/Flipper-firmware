@@ -1,0 +1,27 @@
+name: Update OFW branch
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+jobs:
+  update-ofw-catalog-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: "recursive"
+          ref: master_ofw-catalog
+      - run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git fetch origin
+          git reset --hard origin/master
+      - run: |
+          sed -i 's/apptype=FlipperAppType.PLUGIN,/apptype=FlipperAppType.PLUGIN,\n    fal_embedded=True,/' totp/application.fam
+          printf "\n#define TOTP_APP_VERSION_META \"$(git rev-parse --short HEAD).ofw-catalog\"\n" >> totp/version.h
+          sed -i 's~apps_data/totp/plugins/~apps_assets/totp/plugins/~' totp/cli/cli.c
+      - run: |
+          git commit -am "chore: Applied OFW catalog changes"
+          git push -u --force origin master_ofw-catalog

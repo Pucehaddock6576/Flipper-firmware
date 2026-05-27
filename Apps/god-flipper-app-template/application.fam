@@ -1,0 +1,13 @@
+App(
+    appid="god",
+    name="God",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="god_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    fap_description="The Word of God",
+    fap_version="1.0",
+    fap_category="Misc",
+    fap_file_assets="dict",
+)
