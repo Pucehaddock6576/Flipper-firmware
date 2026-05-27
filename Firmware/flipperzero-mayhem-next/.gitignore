@@ -1,0 +1,8 @@
+esp32.esp32.esp32
+debug.cfg
+debug*.json
+*.svd
+.vscode/arduino.json
+.vscode/c_cpp_properties.json
+*.3mf
+esp32cam_marauder/.vscode/settings.json
