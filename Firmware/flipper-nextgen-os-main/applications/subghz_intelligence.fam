@@ -1,0 +1,70 @@
+/* Application Manifest for Sub-GHz Intelligence */
+
+{
+    "name": "Sub-GHz Intelligence",
+    "version": "1.0.0",
+    "author": "Gracestack AI",
+    "description": "Advanced signal intelligence with AI-driven protocol detection",
+    "entry_point": "subghz_app",
+    "icon": "assets/subghz_icon.png",
+    "category": "radio",
+    "permissions": [
+        "subghz.rx",
+        "subghz.tx",
+        "storage.read",
+        "storage.write",
+        "gui.fullscreen"
+    ],
+    "requirements": {
+        "min_firmware": "2.0.0",
+        "ram_min": "64KB",
+        "flash_min": "256KB",
+        "api_version": 2
+    },
+    "features": [
+        "ai_protocol_detection",
+        "signal_analysis",
+        "real_time_processing",
+        "machine_learning",
+        "pattern_recognition"
+    ],
+    "supported_protocols": [
+        "CAME",
+        "NICE_FLO", 
+        "SOMFY",
+        "BETT",
+        "KEELOQ",
+        "HCS300",
+        "HCS200",
+        "OREGON",
+        "LACROSSE",
+        "ACURITE",
+        "BYRON",
+        "CHAMBERLAIN",
+        "HONEYWELL",
+        "LIGHTWAVERF",
+        "BLYNK",
+        "NEXA",
+        "ANSLUT",
+        "ADEMCO",
+        "DSC",
+        "VISONIC",
+        "WIEGAND",
+        "EM4100",
+        "HID"
+    ],
+    "ai_capabilities": {
+        "neural_network": true,
+        "pattern_learning": true,
+        "novelty_detection": true,
+        "confidence_scoring": true,
+        "adaptive_learning": true
+    },
+    "performance": {
+        "max_frequency": 1000000000,
+        "sample_rate": 1000000,
+        "max_protocols": 64,
+        "detection_latency_ms": 100,
+        "accuracy_target": 0.95
+    }
+}

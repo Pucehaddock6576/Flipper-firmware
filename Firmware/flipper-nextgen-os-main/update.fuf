@@ -1,0 +1,17 @@
+Filetype: Flipper firmware upgrade configuration
+Version: 2
+Info: 2.0.0
+Target: 
+Loader: updater.bin
+# little-endian hex!
+Loader CRC: A8 E8 95 53
+Firmware: 
+Radio: 
+Radio address: 00 00 00 00
+Radio version: 00 00 00 00 00 00
+Radio CRC: 00 00 00 00
+Resources: 
+OB reference: 
+OB mask: 
+OB write mask: 
+Splashscreen: 

@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+import os
+import sys
+import json
+from datetime import datetime
+
+# Import SCons
+from SCons.Script import Environment, Default, Export, Exit, Glob
+
+# Add paths
+sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
+
+# Environment setup
+env = Environment(
+    tools=['default'],
+    CC='arm-none-eabi-gcc',
+    CXX='arm-none-eabi-g++',
+    AR='arm-none-eabi-ar',
+    AS='arm-none-eabi-as',
+    OBJCOPY='arm-none-eabi-objcopy',
+    OBJDUMP='arm-none-eabi-objdump',
+    SIZE='arm-none-eabi-size',
+    STRIP='arm-none-eabi-strip'
+)
+
+# Compiler flags for STM32F4
+env.Append(
+    CCFLAGS=[
+        '-mcpu=cortex-m4',
+        '-mthumb',
+        '-mfloat-abi=hard',
+        '-mfpu=fpv4-sp-d16',
+        '-Os',                    # Optimize for size
+        '-g3',                    # Debug info
+        '-Wall',
+        '-Wextra',
+        '-Werror',
+        '-Wno-unused-function'
+    ],
+    CFLAGS=['-std=c11'],
+    CXXFLAGS=['-std=c++17'],
+    CPPDEFINES=[
+        'STM32F4xx',
+        'TARGET_FLIPPER',
+        'FURI_RAM_PREFIX=_ram',
+        'FURI_FLASH_PREFIX=_flash'
+    ],
+    LINKFLAGS=[
+        '-mcpu=cortex-m4',
+        '-mthumb',
+        '-mfloat-abi=hard',
+        '-mfpu=fpv4-sp-d16',
+        '-Wl,--gc-sections',
+        '-Wl,-Map=firmware.map',
+        '-specs=nano.specs',
+        '-specs=nosys.specs',
+        '-Ttargets/f7/link.ld'
+    ],
+    LIBS=['c', 'm', 'gcc', 'stdc++']
+)
+
+# Source directories
+core_sources = Glob('core/**/*.c')
+gui_sources = Glob('gui/**/*.c')
+app_sources = Glob('applications/**/*.c')
+protocol_sources = Glob('protocols/**/*.c')
+driver_sources = Glob('drivers/**/*.c')
+
+# Include directories
+env.Append(CPPPATH=[
+    '.',
+    'core',
+    'core/furi',
+    'gui',
+    'applications',
+    'protocols',
+    'drivers',
+    'targets/f7/inc'
+])
+
+# Build configuration
+def configure_env():
+    """Configure build environment"""
+    
+    # Check for required tools
+    required_tools = ['arm-none-eabi-gcc', 'arm-none-eabi-ar']
+    for tool in required_tools:
+        if not env.WhereIs(tool):
+            print(f"Error: {tool} not found in PATH")
+            Exit(1)
+    
+    # Version information
+    version_info = {
+        "version": "2.0.0",
+        "build": os.environ.get('FLIPPER_BUILD', 'development'),
+        "date": datetime.now().isoformat(),
+        "api_version": 2,
+        "target": "flipper_zero"
+    }
+    
+    # Write version file
+    with open('version.json', 'w') as f:
+        json.dump(version_info, f, indent=2)
+    
+    # Generate version header
+    version_header = f"""
+#ifndef FLIPPER_VERSION_H
+#define FLIPPER_VERSION_H
+
+#define FLIPPER_VERSION "{version_info['version']}"
+#define FLIPPER_BUILD "{version_info['build']}"
+#define FLIPPER_DATE "{version_info['date']}"
+#define FLIPPER_API_VERSION {version_info['api_version']}
+
+#endif // FLIPPER_VERSION_H
+"""
+    
+    with open('core/version.h', 'w') as f:
+        f.write(version_header)
+    
+    print(f"Building Flipper Next-Gen OS {version_info['version']} ({version_info['build']})")
+
+# Build targets
+def build_firmware():
+    """Build main firmware"""
+    
+    # Core library
+    core_lib = env.Library('core', core_sources)
+    
+    # GUI library
+    gui_lib = env.Library('gui', gui_sources)
+    
+    # Applications library
+    apps_lib = env.Library('apps', app_sources)
+    
+    # Protocols library
+    protocols_lib = env.Library('protocols', protocol_sources)
+    
+    # Drivers library
+    drivers_lib = env.Library('drivers', driver_sources)
+    
+    # Main firmware
+    firmware_sources = Glob('targets/f7/*.c')
+    all_libs = [core_lib, gui_lib, apps_lib, protocols_lib, drivers_lib]
+    
+    firmware_elf = env.Program(
+        'flipper_nextgen.elf',
+        firmware_sources,
+        LIBS=all_libs
+    )
+    
+    # Generate binary files
+    bin_file = env.Command(
+        'flipper_nextgen.bin',
+        firmware_elf,
+        '${OBJCOPY} -O binary $SOURCE $TARGET'
+    )
+    
+    hex_file = env.Command(
+        'flipper_nextgen.hex',
+        firmware_elf,
+        '${OBJCOPY} -O ihex $SOURCE $TARGET'
+    )
+    
+    # Size analysis
+    size_info = env.Command(
+        'size_report.txt',
+        firmware_elf,
+        '${SIZE} $SOURCE > $TARGET'
+    )
+    
+    # Disassembly
+    disasm_file = env.Command(
+        'firmware.disasm',
+        firmware_elf,
+        '${OBJDUMP} -d $SOURCE > $TARGET'
+    )
+    
+    return firmware_elf, bin_file, hex_file
+
+# Application building
+def build_app(app_name):
+    """Build individual application"""
+    
+    app_dir = f'applications/{app_name}'
+    app_sources = Glob(f'{app_dir}/**/*.c')
+    
+    app_elf = env.Program(
+        f'{app_dir}/{app_name}.elf',
+        app_sources,
+        LIBS=['core', 'gui']
+    )
+    
+    app_fap = env.Command(
+        f'{app_dir}/{app_name}.fap',
+        app_elf,
+        '${OBJCOPY} -O binary $SOURCE $TARGET'
+    )
+    
+    return app_fap
+
+# Testing
+def run_tests():
+    """Run unit tests"""
+    
+    test_sources = Glob('tests/**/*.c')
+    test_libs = ['core', 'gui']
+    
+    test_elf = env.Program(
+        'test_runner.elf',
+        test_sources,
+        LIBS=test_libs,
+        CPPDEFINES=['UNIT_TEST']
+    )
+    
+    return test_elf
+
+# Documentation
+def build_docs():
+    """Build documentation"""
+    
+    docs_cmd = env.Command(
+        'docs/',
+        '',
+        'python docs/build_docs.py'
+    )
+    
+    return docs_cmd
+
+# Flashing
+def flash_firmware(target_file):
+    """Flash firmware to device"""
+    
+    flash_cmd = env.Command(
+        'flash',
+        target_file,
+        'python tools/flash.py --firmware $SOURCE'
+    )
+    
+    return flash_cmd
+
+# Main build process
+def main():
+    """Main build function"""
+    
+    # Configure environment
+    configure_env()
+    
+    # Build firmware
+    firmware_elf, bin_file, hex_file = build_firmware()
+    
+    print(f"Build targets created:")
+    print(f"  ELF: {firmware_elf}")
+    print(f"  BIN: {bin_file}")
+    print(f"  HEX: {hex_file}")
+    
+    # Default targets
+    env.Alias('firmware', bin_file)
+    env.Alias('elf', firmware_elf)
+    env.Alias('hex', hex_file)
+    env.Alias('size', 'size_report.txt')
+    env.Alias('disasm', 'firmware.disasm')
+    
+    # Application targets
+    app_dirs = [d for d in os.listdir('applications') if os.path.isdir(f'applications/{d}') and d != '__pycache__']
+    for app_name in app_dirs:
+        if os.path.exists(f'applications/{app_name}/application.fam'):
+            app_fap = build_app(app_name)
+            env.Alias(f'app_{app_name}', app_fap)
+    
+    # Test target
+    test_elf = run_tests()
+    env.Alias('test', test_elf)
+    
+    # Documentation target
+    docs_cmd = build_docs()
+    env.Alias('docs', docs_cmd)
+    
+    # Flash target
+    flash_cmd = flash_firmware(bin_file)
+    env.Alias('flash', flash_cmd)
+    
+    # Clean target
+    env.Clean('.', [
+        '*.elf', '*.bin', '*.hex', '*.map',
+        'core/*.o', 'gui/*.o', 'applications/*.o',
+        'protocols/*.o', 'drivers/*.o'
+    ])
+    
+    # Help target
+    env.Help("""
+Flipper Next-Gen OS Build System
+
+Targets:
+  firmware    - Build main firmware (default)
+  elf         - Build ELF file
+  bin         - Build binary file
+  hex         - Build Intel HEX file
+  size        - Generate size report
+  disasm      - Generate disassembly
+  
+  app_<name>  - Build specific application
+  test        - Build and run tests
+  docs        - Build documentation
+  flash       - Flash firmware to device
+  
+  clean       - Clean build artifacts
+  help        - Show this help
+
+Examples:
+  python3 build.py                    # Build firmware
+  python3 build.py -j4               # Build with 4 parallel jobs
+  python3 build.py app_subghz        # Build Sub-GHz app only
+  python3 build.py test              # Run tests
+  python3 build.py flash             # Flash to device
+  
+Environment variables:
+  FLIPPER_BUILD           # Build type (release/debug)
+  FLIPPER_TARGET          # Target platform
+  FLIPPER_VERSION         # Override version
+""")
+    
+    # Default target
+    Default('firmware')
+
+# Execute main build
+main()
+
+# Export for external scripts
+Export('env', 'build_firmware', 'build_app', 'run_tests')
