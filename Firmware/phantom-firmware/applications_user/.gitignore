@@ -1,0 +1,3 @@
+# Allow phantom apps to be tracked
+!phantom_*/
+!phantom_*/**

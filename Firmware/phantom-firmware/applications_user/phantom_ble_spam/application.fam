@@ -1,0 +1,10 @@
+App(
+    appid="phantom_ble_spam",
+    name="[PHANTOM] BLE Spam",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_ble_spam_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=20,
+    fap_category="Phantom",
+)

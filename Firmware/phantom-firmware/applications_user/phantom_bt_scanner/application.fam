@@ -1,0 +1,10 @@
+App(
+    appid="phantom_bt_scanner",
+    name="[PHANTOM] BT Scanner",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_bt_scanner_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=80,
+    fap_category="Phantom",
+)

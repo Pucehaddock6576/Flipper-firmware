@@ -1,0 +1,10 @@
+App(
+    appid="phantom_wifi_deauther",
+    name="[PHANTOM] WiFi Deauther",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_wifi_deauther_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=40,
+    fap_category="Phantom",
+)

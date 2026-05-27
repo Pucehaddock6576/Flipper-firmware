@@ -1,0 +1,10 @@
+App(
+    appid="phantom_wifi_marauder",
+    name="[PHANTOM] WiFi Marauder",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_wifi_marauder_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=10,
+    fap_category="Phantom",
+)

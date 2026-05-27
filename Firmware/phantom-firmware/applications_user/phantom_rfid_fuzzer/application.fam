@@ -1,0 +1,10 @@
+App(
+    appid="phantom_rfid_fuzzer",
+    name="[PHANTOM] RFID Fuzzer",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_rfid_fuzzer_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=70,
+    fap_category="Phantom",
+)

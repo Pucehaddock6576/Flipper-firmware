@@ -1,0 +1,10 @@
+App(
+    appid="phantom_packet_monitor",
+    name="[PHANTOM] Packet Monitor",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_packet_monitor_app",
+    requires=["gui"],
+    stack_size=4 * 1024,
+    order=60,
+    fap_category="Phantom",
+)

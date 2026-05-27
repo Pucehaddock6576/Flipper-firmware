@@ -1,0 +1,10 @@
+App(
+    appid="phantom_password_gen",
+    name="[PHANTOM] Password Gen",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="phantom_password_gen_app",
+    requires=["gui"],
+    stack_size=2 * 1024,
+    order=90,
+    fap_category="Phantom",
+)
